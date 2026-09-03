@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id             String         @id @default(uuid())
+  username       String         @unique
+  password_hash  String
+  name           String
+  contact        String?
+  hasVehicle     Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  memberships    GroupMember[]
+  orders         Order[]        @relation("Purchaser")
+  coOrders       Order[]        @relation("CoPurchaser")
+  participants   OrderParticipant[]
+  paymentsSent   Payment[]      @relation("PaymentsSent")
+  paymentsRecv   Payment[]      @relation("PaymentsReceived")
+  orderPayments  OrderPayer[]
+}
+
+model Group {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  members     GroupMember[]
+  foodItems   FoodItem[]
+  orders      Order[]
+  payments    Payment[]
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  userId    String
+  groupId   String
+  role      String   @default("MEMBER") // ADMIN, MANAGER, MEMBER
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model FoodItem {
+  id           String      @id @default(uuid())
+  groupId      String
+  name         String
+  defaultPrice Float
+  createdAt    DateTime    @default(now())
+
+  group        Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  groupId     String
+  date          DateTime    @default(now())
+  purchaserId   String
+  coPurchaserId String?
+  status        String      @default("UPCOMING") // UPCOMING, COMPLETED
+  createdAt     DateTime    @default(now())
+
+  group         Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  purchaser     User        @relation("Purchaser", fields: [purchaserId], references: [id])
+  coPurchaser   User?       @relation("CoPurchaser", fields: [coPurchaserId], references: [id])
+  orderItems    OrderItem[]
+  orderPayers   OrderPayer[]
+}
+
+model OrderItem {
+  id         String             @id @default(uuid())
+  orderId    String
+  foodItemId String
+  price      Float
+  quantity   Int
+
+  order      Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  foodItem   FoodItem           @relation(fields: [foodItemId], references: [id])
+  participants OrderParticipant[]
+}
+
+model OrderParticipant {
+  id          String    @id @default(uuid())
+  orderItemId String
+  userId      String
+  quantity    Int       @default(1)
+
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orderItemId, userId])
+}
+
+model OrderPayer {
+  id      String @id @default(uuid())
+  orderId String
+  userId  String
+  amount  Float
+
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([orderId, userId])
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  groupId     String
+  fromUserId  String
+  toUserId    String
+  amount      Float
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromUser    User     @relation("PaymentsSent", fields: [fromUserId], references: [id])
+  toUser      User     @relation("PaymentsReceived", fields: [toUserId], references: [id])
+}
